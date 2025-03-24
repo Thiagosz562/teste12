@@ -9,8 +9,6 @@ const excelJS = require('exceljs');
 const nodemailer = require('nodemailer');
 const mysql = require('mysql2/promise'); // Usando mysql2
 const app = express();
-const passport = require("passport");
-const GoogleStrategy = require("passport-google-oauth20").Strategy;
 require("dotenv").config();
 
 
@@ -60,57 +58,7 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID:  process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "http://localhost:5505/auth/google/callback",
-      scope: ["profile", "email"],
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        const email = profile.emails[0].value;
-        const nome = profile.displayName;
-  
-        // Verifica se o usuário já existe no banco de dados
-        const [rows] = await pool.query("SELECT * FROM usuarios WHERE email = ?", [email]);
-  
-        let usuario;
-        if (rows.length === 0) {
-          // Gerando uma senha aleatória para evitar erro de "NULL"
-          const randomPassword = crypto.randomBytes(16).toString('hex');
 
-          // Insere novo usuário com senha aleatória
-          const [result] = await pool.query(
-            "INSERT INTO usuarios (nome, email, senha, telefone1, tipo) VALUES (?, ?, ?, ?, ?)",
-            [nome, email, randomPassword, null, 'pendente']
-          );
-          usuario = { id: result.insertId, nome, email, tipo: 'pendente' };
-        } else {
-          usuario = rows[0];
-        }
-  
-        return done(null, usuario);
-      } catch (error) {
-        return done(error, null);
-      }
-    }
-  )
-);
-
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
-
-passport.deserializeUser(async (id, done) => {
-  try {
-    const [rows] = await pool.query("SELECT * FROM usuarios WHERE id = ?", [id]);
-    done(null, rows[0]);
-  } catch (error) {
-    done(error, null);
-  }
-});
 
 // Rota protegida - Página inicial
 app.get('/calendario', (req, res) => {
@@ -532,7 +480,7 @@ app.post('/solicitar-redefinicao', async (req, res) => {
 
     console.log('Enviando e-mail para:', email);
     const info = await transporter.sendMail(mailOptions);
-    console.log('E-mail enviado:', info.messageId);
+    console.log('E-mail enviado:', info.response); // Alterar para info.response
     
     res.json({ message: 'Um email com instruções foi enviado!' });
   } catch (err) {
